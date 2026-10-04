@@ -5,13 +5,13 @@ import SearchBox from "../../components/SearchBox";
 import WeatherCard from "../../components/WeatherCard";
 import { useDebounce } from "../../hooks/use-debounce";
 import { cariKota } from "../../services/geocodingService";
-import { HasilGeocoding } from "../../types/geocoding";
+import type { HasilGeocoding } from "../../../types/geocoding";
 export default function HalamanUtama() {
   const [teksCari, setTeksCari] = useState("");
   const [hasil, setHasil] = useState<HasilGeocoding[]>([]);
   const [sedangMemuat, setSedangMemuat] = useState(false);
   const [pesanError, setPesanError] = useState<string | null>(null);
-  const teksTertunda = useDebounce(teksCari, 500);
+  const teksTertunda = useDebounce(teksCari, 800);
   useEffect(() => {
     if (teksTertunda.trim().length === 0) {
       setHasil([]);
@@ -38,14 +38,19 @@ export default function HalamanUtama() {
       {sedangMemuat && <ActivityIndicator />}
       {pesanError && (
         <View>
-          <Text>{pesanError}</Text>
+          <Text accessibilityLabel={pesanError}>{pesanError}</Text>
           <Button title="Coba Lagi" onPress={() => ambilData(teksTertunda)} />
         </View>
       )}
       {!sedangMemuat &&
         !pesanError &&
         teksTertunda.length > 0 &&
-        hasil.length === 0 && <Text>Kota tidak ditemukan</Text>}
+        hasil.length === 0 && (
+          <Text accessibilityLabel="Kota tidak ditemukan">
+            Kota tidak ditemukan
+          </Text>
+        )}
+      <Text>Ditemukan {hasil.length} kota</Text>
       {hasil.map((kota) => (
         <WeatherCard
           key={kota.id}
