@@ -27,20 +27,48 @@ export default function HalamanUtama() {
     null,
   );
   const [sedangMemuat, setSedangMemuat] = useState(false);
+  const [sedangMencari, setSedangMencari] = useState(false);
   const [pesanError, setPesanError] = useState<string | null>(null);
+  const [pesanErrorPencarian, setPesanErrorPencarian] = useState<string | null>(
+    null,
+  );
+  const [ulangiPencarian, setUlangiPencarian] = useState(0);
   const teksTertunda = useDebounce(teksCari, 500);
   const requestIdRef = useRef(0); // pencegah race condition
+  const requestPencarianIdRef = useRef(0);
   useEffect(() => {
-    if (teksTertunda.trim().length === 0) {
+    const namaKota = teksTertunda.trim();
+    const idSaatIni = ++requestPencarianIdRef.current;
+    if (namaKota.length === 0) {
       setHasilPencarian([]);
+      setPesanErrorPencarian(null);
+      setSedangMencari(false);
       return;
     }
-    cariKota(teksTertunda)
-      .then(setHasilPencarian)
-      .catch(() => setHasilPencarian([]));
-  }, [teksTertunda]);
+    setSedangMencari(true);
+    setPesanErrorPencarian(null);
+    cariKota(namaKota)
+      .then((hasil) => {
+        if (idSaatIni !== requestPencarianIdRef.current) return;
+        setHasilPencarian(hasil);
+      })
+      .catch(() => {
+        if (idSaatIni !== requestPencarianIdRef.current) return;
+        setHasilPencarian([]);
+        setPesanErrorPencarian(
+          "Gagal mencari kota. Periksa koneksi internet Anda.",
+        );
+      })
+      .finally(() => {
+        if (idSaatIni === requestPencarianIdRef.current) {
+          setSedangMencari(false);
+        }
+      });
+  }, [teksTertunda, ulangiPencarian]);
   async function pilihKota(kota: HasilGeocoding) {
     setKotaTerpilih(kota);
+    setCuaca(null);
+    setKualitasUdara(null);
     const idSaatIni = ++requestIdRef.current;
     setSedangMemuat(true);
     setPesanError(null);
@@ -62,6 +90,18 @@ export default function HalamanUtama() {
   return (
     <SafeAreaView style={{ flex: 1, padding: 16, gap: 16 }}>
       <SearchBox onCari={setTeksCari} />
+      {sedangMencari && <ActivityIndicator />}
+      {pesanErrorPencarian && (
+        <View>
+          <Text accessibilityLabel={pesanErrorPencarian}>
+            {pesanErrorPencarian}
+          </Text>
+          <Button
+            title="Coba Lagi"
+            onPress={() => setUlangiPencarian((nomor) => nomor + 1)}
+          />
+        </View>
+      )}
       {hasilPencarian.map((kota) => (
         <TouchableOpacity key={kota.id} onPress={() => pilihKota(kota)}>
           <Text>{kota.name}</Text>
@@ -78,12 +118,18 @@ export default function HalamanUtama() {
         </View>
       )}
       {cuaca && kualitasUdara && kotaTerpilih && !sedangMemuat && (
-        <WeatherCard
-          kota={kotaTerpilih.name}
-          suhu={cuaca.saatIni.suhu}
-          tingkatAQI={konversiTingkatAQI(kualitasUdara.indeksAQI)}
-          indeksAQI={kualitasUdara.indeksAQI}
-        />
+        <>
+          <WeatherCard
+            kota={kotaTerpilih.name}
+            suhu={cuaca.saatIni.suhu}
+            tingkatAQI={konversiTingkatAQI(kualitasUdara.indeksAQI)}
+            indeksAQI={kualitasUdara.indeksAQI}
+          />
+          <Text style={{ fontSize: 14, color: "#666" }}>
+            Hari ini: Maks {cuaca.harian.suhuMaksimal[0]}°C · Min{" "}
+            {cuaca.harian.suhuMinimal[0]}°C
+          </Text>
+        </>
       )}
       {cuaca && (
         <Text style={{ fontSize: 12, color: "#888" }}>
@@ -91,8 +137,12 @@ export default function HalamanUtama() {
           {cuaca.saatIni.kecepatanAngin} km/j
         </Text>
       )}
+      {kualitasUdara && (
+        <Text style={{ fontSize: 12, color: "#888" }}>
+          PM2.5: {kualitasUdara.pm25} µg/m³ · PM10: {kualitasUdara.pm10} µg/m³
+        </Text>
+      )}
       <AtribusiCuaca />
     </SafeAreaView>
   );
 }
-git
